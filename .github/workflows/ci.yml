@@ -1,0 +1,41 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Configure
+        run: cmake -S . -B build -DTAHOMA_VISION_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build build --parallel 2
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Install
+        run: cmake --install build --prefix "$PWD/install"
+      - name: Test installed package
+        run: |
+          cmake -S tests/consumer -B build-consumer \
+            -DCMAKE_PREFIX_PATH="$PWD/install"
+          cmake --build build-consumer --parallel 2
+          ./build-consumer/tahoma_vision_consumer
+      - name: Test subdirectory embedding
+        run: |
+          cmake -S tests/subdirectory-consumer -B build-subdirectory-consumer
+          cmake --build build-subdirectory-consumer --parallel 2
+          ./build-subdirectory-consumer/tahoma_vision_subdirectory_consumer
+      - name: Test optional PDFium binary
+        run: |
+          cmake -S . -B build-pdfium \
+            -DTAHOMA_VISION_PDF=ON \
+            -DTAHOMA_VISION_BUILD_TESTS=ON \
+            -DTAHOMA_VISION_INSTALL=OFF
+          cmake --build build-pdfium --parallel 2
+          ctest --test-dir build-pdfium --output-on-failure \
+            -R tahoma_vision.pdfium

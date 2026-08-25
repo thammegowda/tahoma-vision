@@ -1,0 +1,6 @@
+[submodule "libs/pigzpp"]
+	path = libs/pigzpp
+	url = https://github.com/thammegowda/pigzpp.git
+[submodule "libs/libjpeg-turbo"]
+	path = libs/libjpeg-turbo
+	url = https://github.com/libjpeg-turbo/libjpeg-turbo.git

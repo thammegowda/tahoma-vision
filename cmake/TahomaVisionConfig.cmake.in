@@ -1,0 +1,15 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(Threads)
+
+if(NOT TARGET TahomaVision::Jpeg)
+	add_library(TahomaVision::Jpeg STATIC IMPORTED)
+	set_target_properties(TahomaVision::Jpeg PROPERTIES
+		IMPORTED_LOCATION
+			"${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_LIBDIR@/libtahoma_vision_jpeg.a")
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/TahomaVisionTargets.cmake")
+
+check_required_components(TahomaVision)
