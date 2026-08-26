@@ -1,13 +1,18 @@
 #include <tahoma/vision/codec.h>
+#include <tahoma/vision/document_conversion.h>
 #include <tahoma/vision/io.h>
 
 #include <algorithm>
 #include <array>
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
 #include <string_view>
+
+#include <jpeglib.h>
 
 namespace {
 
@@ -44,6 +49,89 @@ tahoma::vision::Image format_fixture(tahoma::vision::PixelFormat format) {
         result.pixels[index] = static_cast<uint8_t>(index * 17 + 3);
     }
     return result;
+}
+
+std::vector<uint8_t> cmyk_jpeg_fixture() {
+    jpeg_compress_struct encoder{};
+    jpeg_error_mgr error{};
+    encoder.err = jpeg_std_error(&error);
+    jpeg_create_compress(&encoder);
+    unsigned char* output = nullptr;
+    unsigned long output_size = 0;
+    jpeg_mem_dest(&encoder, &output, &output_size);
+    encoder.image_width = 2;
+    encoder.image_height = 1;
+    encoder.input_components = 4;
+    encoder.in_color_space = JCS_CMYK;
+    jpeg_set_defaults(&encoder);
+    jpeg_set_quality(&encoder, 100, TRUE);
+    jpeg_start_compress(&encoder, TRUE);
+    std::array<uint8_t, 8> pixels{
+        255, 0, 0, 255,
+        0, 255, 0, 255,
+    };
+    JSAMPROW row = pixels.data();
+    jpeg_write_scanlines(&encoder, &row, 1);
+    jpeg_finish_compress(&encoder);
+    std::vector<uint8_t> result(output, output + output_size);
+    jpeg_destroy_compress(&encoder);
+    std::free(output);
+    return result;
+}
+
+std::vector<uint8_t> oriented_jpeg_fixture(uint8_t orientation) {
+    jpeg_compress_struct encoder{};
+    jpeg_error_mgr error{};
+    encoder.err = jpeg_std_error(&error);
+    jpeg_create_compress(&encoder);
+    unsigned char* output = nullptr;
+    unsigned long output_size = 0;
+    jpeg_mem_dest(&encoder, &output, &output_size);
+    encoder.image_width = 2;
+    encoder.image_height = 3;
+    encoder.input_components = 3;
+    encoder.in_color_space = JCS_RGB;
+    jpeg_set_defaults(&encoder);
+    jpeg_set_quality(&encoder, 100, TRUE);
+    jpeg_start_compress(&encoder, TRUE);
+    const std::array<uint8_t, 32> exif{
+        'E', 'x', 'i', 'f', 0, 0,
+        'I', 'I', 42, 0, 8, 0, 0, 0,
+        1, 0,
+        0x12, 0x01, 3, 0, 1, 0, 0, 0, orientation, 0, 0, 0,
+        0, 0, 0, 0,
+    };
+    jpeg_write_marker(
+        &encoder, JPEG_APP0 + 1, exif.data(), exif.size());
+    std::array<uint8_t, 18> pixels{
+        255, 0, 0, 0, 255, 0,
+        0, 0, 255, 255, 255, 0,
+        255, 0, 255, 0, 255, 255,
+    };
+    while (encoder.next_scanline < encoder.image_height) {
+        JSAMPROW row = pixels.data() + encoder.next_scanline * 6;
+        jpeg_write_scanlines(&encoder, &row, 1);
+    }
+    jpeg_finish_compress(&encoder);
+    std::vector<uint8_t> result(output, output + output_size);
+    jpeg_destroy_compress(&encoder);
+    std::free(output);
+    return result;
+}
+
+std::pair<int64_t, int64_t> oriented_coordinate(
+        int orientation, int64_t x, int64_t y,
+        int64_t width, int64_t height) {
+    switch (orientation) {
+        case 2: return {width - 1 - x, y};
+        case 3: return {width - 1 - x, height - 1 - y};
+        case 4: return {x, height - 1 - y};
+        case 5: return {y, x};
+        case 6: return {height - 1 - y, x};
+        case 7: return {height - 1 - y, width - 1 - x};
+        case 8: return {y, width - 1 - x};
+        default: return {x, y};
+    }
 }
 
 void test_format_detection() {
@@ -175,6 +263,143 @@ void test_png_contract() {
     });
 }
 
+double mean_absolute_error(
+    const tahoma::vision::Image& left,
+    const tahoma::vision::Image& right) {
+    require(left.width == right.width && left.height == right.height,
+        "image geometries differ");
+    require(left.format == right.format, "image formats differ");
+    require(left.pixels.size() == right.pixels.size(), "image sizes differ");
+    uint64_t error = 0;
+    for (size_t index = 0; index < left.pixels.size(); ++index) {
+    error += static_cast<uint64_t>(std::abs(
+        static_cast<int>(left.pixels[index]) - right.pixels[index]));
+    }
+    return static_cast<double>(error) / left.pixels.size();
+}
+
+void test_resource_round_trips() {
+    using namespace tahoma::vision;
+    const std::filesystem::path resources{TAHOMA_VISION_TEST_RESOURCE_DIR};
+    const auto png = load(resources / "pattern.png");
+    const auto jpeg = load(resources / "pattern.jpg");
+    require(png.width == 64 && png.height == 48, "PNG fixture geometry changed");
+    require(jpeg.width == 64 && jpeg.height == 48,
+        "JPEG fixture geometry changed");
+
+    const auto temporary = std::filesystem::temp_directory_path();
+    const auto png_path = temporary / "tahoma-vision-roundtrip.png";
+    save(png_path, png.view());
+    require(load(png_path).pixels == png.pixels,
+        "PNG resource file round-trip changed pixels");
+    std::filesystem::remove(png_path);
+
+    const auto jpeg_path = temporary / "tahoma-vision-roundtrip.jpg";
+    EncodeOptions jpeg_options;
+    jpeg_options.format = Format::Jpeg;
+    jpeg_options.jpeg.quality = 95;
+    save(jpeg_path, jpeg.view(), jpeg_options);
+    const auto jpeg_roundtrip = load(jpeg_path);
+        const auto error = mean_absolute_error(jpeg, jpeg_roundtrip);
+        require(error < 6.0,
+            "JPEG resource round-trip MAE " + std::to_string(error) +
+            " exceeded tolerance");
+    std::filesystem::remove(jpeg_path);
+}
+
+void test_jpeg_contract() {
+    using namespace tahoma::vision;
+    const auto rgb = fixture();
+    for (const auto quality : {1, 95, 100}) {
+        const auto encoded = encode_jpeg(rgb.view(), {.quality = quality});
+        const auto decoded = decode(encoded);
+        require(decoded.width == rgb.width, "JPEG width changed");
+        require(decoded.height == rgb.height, "JPEG height changed");
+        require(decoded.format == PixelFormat::RGB8, "JPEG format changed");
+    }
+
+    const auto gray = format_fixture(PixelFormat::Gray8);
+    const auto gray_encoded = encode_jpeg(gray.view(), {.quality = 100});
+    const auto gray_decoded = decode(
+        gray_encoded, {.output_format = PixelFormat::Gray8});
+    require(gray_decoded.format == PixelFormat::Gray8,
+            "grayscale JPEG format changed");
+    require(gray_decoded.pixels.size() == gray.pixels.size(),
+            "grayscale JPEG size changed");
+    for (size_t index = 0; index < gray.pixels.size(); ++index) {
+        require(std::abs(
+                    static_cast<int>(gray_decoded.pixels[index]) -
+                    static_cast<int>(gray.pixels[index])) <= 1,
+                "quality-100 grayscale JPEG drift exceeded one value");
+    }
+
+    require_codec_error(CodecErrorCode::MalformedInput, [&] {
+        static_cast<void>(encode_jpeg(rgb.view(), {.quality = 0}));
+    });
+    require_codec_error(CodecErrorCode::MalformedInput, [&] {
+        static_cast<void>(encode_jpeg(rgb.view(), {.quality = 101}));
+    });
+    require_codec_error(CodecErrorCode::UnsupportedFeature, [&] {
+        const auto rgba = format_fixture(PixelFormat::RGBA8);
+        static_cast<void>(encode_jpeg(rgba.view()));
+    });
+
+    auto truncated = encode_jpeg(rgb.view());
+    truncated.resize(truncated.size() / 2);
+    require_codec_error(CodecErrorCode::MalformedInput, [&] {
+        static_cast<void>(decode(truncated));
+    });
+    require_codec_error(CodecErrorCode::ResourceLimit, [&] {
+        const auto encoded = encode_jpeg(rgb.view());
+        static_cast<void>(decode(encoded, {.max_pixels = 1}));
+    });
+
+    const auto cmyk = cmyk_jpeg_fixture();
+    const auto cmyk_rgb = decode(cmyk);
+    require(cmyk_rgb.width == 2 && cmyk_rgb.height == 1,
+            "CMYK JPEG geometry changed");
+    require(cmyk_rgb.pixels[0] > cmyk_rgb.pixels[1] &&
+            cmyk_rgb.pixels[0] > cmyk_rgb.pixels[2],
+            "CMYK red pixel conversion failed");
+    require(cmyk_rgb.pixels[4] > cmyk_rgb.pixels[3] &&
+            cmyk_rgb.pixels[4] > cmyk_rgb.pixels[5],
+            "CMYK green pixel conversion failed");
+    const auto cmyk_gray = decode(
+        cmyk, {.output_format = PixelFormat::Gray8});
+    require(cmyk_gray.pixels.size() == 2,
+            "CMYK grayscale conversion size changed");
+
+    for (int orientation = 1; orientation <= 8; ++orientation) {
+        const auto encoded = oriented_jpeg_fixture(
+            static_cast<uint8_t>(orientation));
+        const auto baseline = decode(
+            encoded, {.apply_exif_orientation = false});
+        const auto oriented = decode(encoded);
+        const auto swaps_axes = orientation >= 5;
+        require(oriented.width ==
+                    (swaps_axes ? baseline.height : baseline.width),
+                "EXIF orientation width is incorrect");
+        require(oriented.height ==
+                    (swaps_axes ? baseline.width : baseline.height),
+                "EXIF orientation height is incorrect");
+        for (int64_t y = 0; y < baseline.height; ++y) {
+            for (int64_t x = 0; x < baseline.width; ++x) {
+                const auto [target_x, target_y] = oriented_coordinate(
+                    orientation, x, y, baseline.width, baseline.height);
+                const auto source_offset = static_cast<size_t>(
+                    y * baseline.row_stride + x * 3);
+                const auto target_offset = static_cast<size_t>(
+                    target_y * oriented.row_stride + target_x * 3);
+                require(std::equal(
+                            baseline.pixels.begin() + source_offset,
+                            baseline.pixels.begin() + source_offset + 3,
+                            oriented.pixels.begin() + target_offset),
+                        "EXIF orientation moved a pixel incorrectly");
+            }
+        }
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -182,6 +407,8 @@ int main() {
         test_format_detection();
         test_contracts_and_codecs();
         test_png_contract();
+        test_resource_round_trips();
+        test_jpeg_contract();
         std::cout << "Tahoma Vision contract and codec tests passed\n";
         return 0;
     } catch (const std::exception& error) {

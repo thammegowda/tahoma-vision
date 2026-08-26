@@ -32,6 +32,9 @@ Run `make help` for install, PDFium, refresh, and cleanup targets. Override
 parallelism with `JOBS`, and the installation destination with
 `INSTALL_PREFIX`.
 
+See [docs/](docs/) for PNG/JPEG read-write examples and PDF page rendering or
+image-to-PDF examples.
+
 Direct dependency pins are `libs/pigzpp` at `v1.1.0` and
 `libs/libjpeg-turbo` at `3.2.0`. With `TAHOMA_VISION_PDF=ON`, the
 `cmake/pdfium.cmake` setup function downloads a checksum-pinned non-V8 PDFium

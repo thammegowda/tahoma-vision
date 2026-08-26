@@ -40,6 +40,7 @@ ExternalProject_Add(tahoma_vision_libjpeg
     CMAKE_ARGS
         "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
         "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
+        "-DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}"
         "-DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>"
         "-DCMAKE_INSTALL_LIBDIR=${CMAKE_INSTALL_LIBDIR}"
         "-DCMAKE_POSITION_INDEPENDENT_CODE=ON"
@@ -81,6 +82,7 @@ add_dependencies(tahoma_vision tahoma_vision_libjpeg)
 
 tahoma_vision_validate_neutral_sources(
     tahoma/vision/codec.h
+    tahoma/vision/document_conversion.h
     tahoma/vision/format.h
     tahoma/vision/image.h
     tahoma/vision/io.h
@@ -111,8 +113,12 @@ endif()
 if(TAHOMA_VISION_PDF)
     include(cmake/pdfium.cmake)
     tahoma_setup_pdfium()
-    message(STATUS
-        "PDFium dependency is available; the document renderer is not implemented yet")
+    target_sources(tahoma_vision PRIVATE tahoma/vision/pdf.cpp)
+    target_link_libraries(tahoma_vision PRIVATE PDFium::PDFium)
+    target_compile_definitions(tahoma_vision PUBLIC TAHOMA_VISION_HAS_PDF=1)
+    tahoma_vision_validate_neutral_sources(
+        tahoma/vision/pdf.h
+        tahoma/vision/pdf.cpp)
 endif()
 
 if(TAHOMA_VISION_INSTALL)
