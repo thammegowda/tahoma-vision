@@ -44,5 +44,8 @@ void validate(const Image& image);
 [[nodiscard]] Image make_image(
     int64_t width, int64_t height,
     PixelFormat format = PixelFormat::RGB8);
+[[nodiscard]] Image crop(
+    ImageView image, int64_t x, int64_t y,
+    int64_t width, int64_t height);
 
 }  // namespace tahoma::vision

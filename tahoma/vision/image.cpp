@@ -1,5 +1,6 @@
 #include <tahoma/vision/image.h>
 
+#include <algorithm>
 #include <limits>
 #include <stdexcept>
 
@@ -76,6 +77,27 @@ Image make_image(int64_t width, int64_t height, PixelFormat format) {
     const auto size = required_buffer_bytes(
         width, height, format, row_stride);
     return {width, height, format, row_stride, std::vector<uint8_t>(size)};
+}
+
+Image crop(
+        ImageView image, int64_t x, int64_t y,
+        int64_t width, int64_t height) {
+    validate(image);
+    if (x < 0 || y < 0 || width <= 0 || height <= 0 ||
+        x > image.width - width || y > image.height - height) {
+        throw std::invalid_argument("image crop is outside source geometry");
+    }
+    auto result = make_image(width, height, image.format);
+    const auto channels = channel_count(image.format);
+    const auto row_bytes = packed_row_bytes(width, image.format);
+    for (int64_t row = 0; row < height; ++row) {
+        const auto source_offset = static_cast<size_t>(y + row) *
+            image.row_stride + static_cast<size_t>(x) * channels;
+        std::copy_n(
+            image.pixels.begin() + source_offset, row_bytes,
+            result.pixels.begin() + static_cast<size_t>(row) * result.row_stride);
+    }
+    return result;
 }
 
 }  // namespace tahoma::vision

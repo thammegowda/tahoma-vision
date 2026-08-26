@@ -156,6 +156,37 @@ void test_format_detection() {
     require(detect_format({}) == Format::Unknown, "empty input was detected");
 }
 
+void test_image_crop() {
+    using namespace tahoma::vision;
+    const std::vector<uint8_t> pixels{
+        1, 2, 3, 4, 5, 6, 99, 99,
+        7, 8, 9, 10, 11, 12, 99, 99,
+        13, 14, 15, 16, 17, 18,
+    };
+    const ImageView source{
+        .width = 2,
+        .height = 3,
+        .format = PixelFormat::RGB8,
+        .row_stride = 8,
+        .pixels = pixels,
+    };
+
+    const auto result = crop(source, 1, 1, 1, 2);
+    require(result.width == 1 && result.height == 2,
+            "crop geometry changed");
+    require(result.row_stride == 3, "crop output is not packed");
+    require(result.pixels == (std::vector<uint8_t>{10, 11, 12, 16, 17, 18}),
+            "strided crop changed pixels");
+
+    bool rejected = false;
+    try {
+        static_cast<void>(crop(source, 2, 0, 1, 1));
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected, "out-of-bounds crop was accepted");
+}
+
 void test_contracts_and_codecs() {
     using namespace tahoma::vision;
     const auto source = fixture();
@@ -413,6 +444,7 @@ void test_jpeg_contract() {
 int main() {
     try {
         test_format_detection();
+        test_image_crop();
         test_contracts_and_codecs();
         test_png_contract();
         test_resource_round_trips();
