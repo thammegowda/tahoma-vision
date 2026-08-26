@@ -113,14 +113,28 @@ if(TAHOMA_VISION_SVG)
 endif()
 
 if(TAHOMA_VISION_PDF)
+    include(FetchContent)
+    FetchContent_Declare(tahoma_pugixml
+        GIT_REPOSITORY https://github.com/zeux/pugixml.git
+        GIT_TAG ee86beb30e4973f5feffe3ce63bfa4fbadf72f38
+        GIT_SHALLOW TRUE
+        SOURCE_SUBDIR _no_cmake_project)
+    FetchContent_MakeAvailable(tahoma_pugixml)
+
     include(cmake/pdfium.cmake)
     tahoma_setup_pdfium()
-    target_sources(tahoma_vision PRIVATE tahoma/vision/pdf.cpp)
+    target_sources(tahoma_vision PRIVATE
+        tahoma/vision/pdf.cpp
+        tahoma/vision/pdf_text_layer.cpp
+        ${tahoma_pugixml_SOURCE_DIR}/src/pugixml.cpp)
+    target_include_directories(tahoma_vision PRIVATE
+        ${tahoma_pugixml_SOURCE_DIR}/src)
     target_link_libraries(tahoma_vision PRIVATE PDFium::PDFium)
     target_compile_definitions(tahoma_vision PUBLIC TAHOMA_VISION_HAS_PDF=1)
     tahoma_vision_validate_neutral_sources(
         tahoma/vision/pdf.h
-        tahoma/vision/pdf.cpp)
+        tahoma/vision/pdf.cpp
+        tahoma/vision/pdf_text_layer.cpp)
 endif()
 
 if(TAHOMA_VISION_INSTALL)
