@@ -4,13 +4,17 @@
 
 #include <algorithm>
 #include <array>
+#include <barrier>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
 #include <string_view>
+#include <thread>
 
 #include <jpeglib.h>
 
@@ -439,6 +443,71 @@ void test_jpeg_contract() {
     }
 }
 
+void test_codec_concurrency() {
+    using namespace tahoma::vision;
+    const auto source = fixture();
+    const auto expected_png = encode_png(source.view());
+    const auto expected_jpeg = encode_jpeg(source.view(), {.quality = 95});
+    const auto expected_jpeg_image = decode(expected_jpeg);
+    constexpr size_t worker_count = 8;
+    constexpr size_t iterations = 16;
+    std::barrier start{worker_count};
+    std::array<std::exception_ptr, worker_count> errors;
+    std::array<std::thread, worker_count> workers;
+    for (size_t worker = 0; worker < worker_count; ++worker) {
+        workers[worker] = std::thread{[&, worker] {
+            try {
+                start.arrive_and_wait();
+                for (size_t iteration = 0; iteration < iterations; ++iteration) {
+                    const auto png = encode_png(source.view());
+                    require(png == expected_png,
+                            "concurrent PNG encoding changed bytes");
+                    require(decode(png).pixels == source.pixels,
+                            "concurrent PNG decoding changed pixels");
+                    const auto jpeg = encode_jpeg(
+                        source.view(), {.quality = 95});
+                    require(jpeg == expected_jpeg,
+                            "concurrent JPEG encoding changed bytes");
+                    require(decode(jpeg).pixels == expected_jpeg_image.pixels,
+                            "concurrent JPEG decoding changed pixels");
+                }
+            } catch (...) {
+                errors[worker] = std::current_exception();
+            }
+        }};
+    }
+    for (auto& worker : workers) worker.join();
+    for (const auto& error : errors) {
+        if (error) std::rethrow_exception(error);
+    }
+}
+
+void test_codec_performance() {
+    using namespace tahoma::vision;
+    auto source = make_image(512, 512, PixelFormat::RGB8);
+    for (size_t index = 0; index < source.pixels.size(); ++index) {
+        source.pixels[index] = static_cast<uint8_t>(
+            (index * 29 + index / 97 + 11) % 256);
+    }
+    constexpr size_t iterations = 4;
+    const auto started = std::chrono::steady_clock::now();
+    for (size_t iteration = 0; iteration < iterations; ++iteration) {
+        const auto encoded = encode_png(
+            source.view(), {.preset = PngPreset::Fast});
+        require(decode(encoded).pixels == source.pixels,
+                "performance PNG round-trip changed pixels");
+    }
+    const double seconds = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - started).count();
+    const double megapixels_per_second =
+        static_cast<double>(iterations * source.width * source.height) /
+        1'000'000.0 / seconds;
+    std::cout << "Tahoma Vision PNG round-trip throughput: "
+              << megapixels_per_second << " MP/s\n";
+    require(megapixels_per_second >= 0.25,
+            "PNG round-trip throughput fell below 0.25 MP/s");
+}
+
 }  // namespace
 
 int main() {
@@ -449,6 +518,8 @@ int main() {
         test_png_contract();
         test_resource_round_trips();
         test_jpeg_contract();
+        test_codec_concurrency();
+        test_codec_performance();
         std::cout << "Tahoma Vision contract and codec tests passed\n";
         return 0;
     } catch (const std::exception& error) {
