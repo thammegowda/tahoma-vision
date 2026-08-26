@@ -6,6 +6,7 @@ namespace tahoma::vision {
 
 Image decode_png(std::span<const uint8_t>, const DecodeOptions&);
 Image decode_jpeg(std::span<const uint8_t>, const DecodeOptions&);
+Image decode_ppm(std::span<const uint8_t>, const DecodeOptions&);
 
 CodecError::CodecError(CodecErrorCode code, std::string message)
     : std::runtime_error(std::move(message)), code_(code) {}
@@ -15,6 +16,7 @@ Image decode(
     switch (detect_format(encoded)) {
         case Format::Png: return decode_png(encoded, options);
         case Format::Jpeg: return decode_jpeg(encoded, options);
+        case Format::Ppm: return decode_ppm(encoded, options);
         case Format::Pdf:
             throw CodecError{
                 CodecErrorCode::UnsupportedFormat,

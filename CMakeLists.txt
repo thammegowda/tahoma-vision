@@ -66,6 +66,7 @@ add_library(tahoma_vision
     tahoma/vision/io.cpp
     tahoma/vision/jpeg_codec.cpp
     tahoma/vision/png_codec.cpp)
+target_sources(tahoma_vision PRIVATE tahoma/vision/ppm_codec.cpp)
 add_library(TahomaVision::Vision ALIAS tahoma_vision)
 
 set_target_properties(tahoma_vision PROPERTIES
@@ -92,6 +93,7 @@ tahoma_vision_validate_neutral_sources(
     tahoma/vision/io.cpp
     tahoma/vision/jpeg_codec.cpp
     tahoma/vision/png_codec.cpp)
+    tahoma_vision_validate_neutral_sources(tahoma/vision/ppm_codec.cpp)
 
 if(TAHOMA_VISION_BUILD_TESTS)
     enable_testing()

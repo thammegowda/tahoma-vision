@@ -10,6 +10,7 @@ enum class Format : uint8_t {
     Unknown,
     Png,
     Jpeg,
+    Ppm,
     Svg,
     Pdf,
 };

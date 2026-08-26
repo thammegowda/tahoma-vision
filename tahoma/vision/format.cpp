@@ -41,10 +41,15 @@ Format detect_format(std::span<const uint8_t> encoded) noexcept {
     static constexpr std::array<uint8_t, 8> png{
         0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a};
     static constexpr std::array<uint8_t, 2> jpeg{0xff, 0xd8};
+    static constexpr std::array<uint8_t, 2> ppm{'P', '6'};
+    static constexpr std::array<uint8_t, 2> pgm{'P', '5'};
     static constexpr std::array<uint8_t, 5> pdf{'%', 'P', 'D', 'F', '-'};
 
     if (starts_with(encoded, png)) return Format::Png;
     if (starts_with(encoded, jpeg)) return Format::Jpeg;
+    if (starts_with(encoded, ppm) || starts_with(encoded, pgm)) {
+        return Format::Ppm;
+    }
     if (starts_with(encoded, pdf)) return Format::Pdf;
     if (is_svg(encoded)) return Format::Svg;
     return Format::Unknown;
@@ -55,6 +60,7 @@ std::string_view name_of(Format format) noexcept {
         case Format::Unknown: return "unknown";
         case Format::Png: return "png";
         case Format::Jpeg: return "jpeg";
+        case Format::Ppm: return "ppm";
         case Format::Svg: return "svg";
         case Format::Pdf: return "pdf";
     }

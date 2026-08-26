@@ -140,11 +140,13 @@ void test_format_detection() {
     const std::array<uint8_t, 8> png{
         0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a};
     const std::array<uint8_t, 3> jpeg{0xff, 0xd8, 0xff};
+    const std::array<uint8_t, 2> ppm{'P', '6'};
     const std::array<uint8_t, 8> pdf{'%', 'P', 'D', 'F', '-', '1', '.', '7'};
     constexpr std::string_view svg =
         "<?xml version=\"1.0\"?>\n<svg viewBox=\"0 0 1 1\"></svg>";
     require(detect_format(png) == Format::Png, "PNG was not detected");
     require(detect_format(jpeg) == Format::Jpeg, "JPEG was not detected");
+    require(detect_format(ppm) == Format::Ppm, "PPM was not detected");
     require(detect_format(pdf) == Format::Pdf, "PDF was not detected");
     require(
         detect_format(std::span{
@@ -177,6 +179,12 @@ void test_contracts_and_codecs() {
     require(jpeg_result.height == source.height, "JPEG height changed");
     require(jpeg_result.pixels.size() == source.pixels.size(),
             "JPEG output size changed");
+
+    const auto ppm_bytes = encode_ppm(source.view());
+    const auto ppm_result = decode(ppm_bytes);
+    require(ppm_result.pixels == source.pixels, "PPM round-trip changed pixels");
+    require(base64_decode(base64_encode(ppm_bytes)) == ppm_bytes,
+            "base64 round-trip changed bytes");
 
     const auto path = std::filesystem::temp_directory_path() /
         "tahoma-vision-smoke.png";

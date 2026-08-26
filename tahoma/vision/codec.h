@@ -60,5 +60,6 @@ struct JpegEncodeOptions {
     ImageView image, const PngEncodeOptions& options = {});
 [[nodiscard]] std::vector<uint8_t> encode_jpeg(
     ImageView image, const JpegEncodeOptions& options = {});
+[[nodiscard]] std::vector<uint8_t> encode_ppm(ImageView image);
 
 }  // namespace tahoma::vision
