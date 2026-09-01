@@ -3,3 +3,4 @@
 /install*/
 /.cache/
 /compile_commands.json
+/tests/resources/text-layer-demo/

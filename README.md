@@ -38,7 +38,8 @@ image-to-PDF examples.
 Direct dependency pins are `libs/pigzpp` at `v1.1.0` and
 `libs/libjpeg-turbo` at `3.2.0`. With `TAHOMA_VISION_PDF=ON`, the
 `cmake/pdfium.cmake` setup function downloads a checksum-pinned non-V8 PDFium
-binary; `libs/pdfium` contains its dependency-policy notes.
+binary and the build fetches pinned pugixml source for restricted SVG text-layer
+parsing; `libs/pdfium` contains its dependency-policy notes.
 Official PDFium source and build documentation remain at
 https://pdfium.googlesource.com/pdfium/.
 
