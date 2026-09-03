@@ -4,18 +4,18 @@ Tahoma Vision is a standalone C++23 library for provider-neutral image and
 document decoding without a tensor-framework dependency.
 
 This is my attempt to replace [pytorch/vision](https://github.com/pytorch/vision). It differs from torchvision library in these ways:
-* Torch-free which is bulky. No libtorch dependency (bulky, and lot of dynamic libs) or any such tensor backend. Bring your own tensor library.  
+* Torch-free (or any such tensor backend). libtorch is bulky, and requires many dynamic libs. Bring your own tensor library!  
 * PNG is powered by [thammegowda/pigzpp](https://github.com/thammegowda/pigzpp) PNG -- a faster PNG library
 * PDF support, using PDFium. 
 
 ## Design boundaries
 
 - Public codec values are owned or viewed interleaved host pixels.
-- The base target does not depend on Tahoma, Torch, ATen, c10, CUDA, ORT, or  any inference provider.
+- The base target does not depend on Tahoma, Torch/ATen/c10, CUDA, ORT, or any inference provider.
 - Tensor adapters belong to consuming repositories.
 - PDFium is optional and disabled by default.
 - In-memory APIs are primary; file helpers are convenience APIs.
-- Public headers and implementations are colocated under `tahoma/vision/`.
+- Public headers and implementations are colocated under `tahoma/vision/` 
 - Required source repositories are pinned Git submodules under `libs/`.
 - Large optional binary dependencies use small CMake adapters under `libs/`.
 
