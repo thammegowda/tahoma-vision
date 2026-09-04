@@ -30,8 +30,12 @@ tahoma_vision_require_submodule(libs/libjpeg-turbo/CMakeLists.txt)
 # through ExternalProject because its build rejects add_subdirectory().
 set(TAHOMA_VISION_JPEG_PREFIX
     "${CMAKE_CURRENT_BINARY_DIR}/libjpeg-turbo-install")
+set(TAHOMA_VISION_JPEG_FILENAME
+    "${CMAKE_STATIC_LIBRARY_PREFIX}jpeg${CMAKE_STATIC_LIBRARY_SUFFIX}")
 set(TAHOMA_VISION_JPEG_LIBRARY
-    "${TAHOMA_VISION_JPEG_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libjpeg.a")
+    "${TAHOMA_VISION_JPEG_PREFIX}/${CMAKE_INSTALL_LIBDIR}/${TAHOMA_VISION_JPEG_FILENAME}")
+set(TAHOMA_VISION_JPEG_INSTALL_NAME
+    "${CMAKE_STATIC_LIBRARY_PREFIX}tahoma_vision_jpeg${CMAKE_STATIC_LIBRARY_SUFFIX}")
 file(MAKE_DIRECTORY "${TAHOMA_VISION_JPEG_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}")
 ExternalProject_Add(tahoma_vision_libjpeg
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libs/libjpeg-turbo"
@@ -146,7 +150,7 @@ if(TAHOMA_VISION_INSTALL)
         INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
     install(FILES "${TAHOMA_VISION_JPEG_LIBRARY}"
         DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RENAME libtahoma_vision_jpeg.a)
+        RENAME "${TAHOMA_VISION_JPEG_INSTALL_NAME}")
     install(DIRECTORY tahoma/
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/tahoma
         FILES_MATCHING PATTERN "*.h")
@@ -167,4 +171,6 @@ if(TAHOMA_VISION_INSTALL)
         ${CMAKE_CURRENT_BINARY_DIR}/TahomaVisionConfig.cmake
         ${CMAKE_CURRENT_BINARY_DIR}/TahomaVisionConfigVersion.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/TahomaVision)
+
+    install(FILES LICENSE NOTICES.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
 endif()

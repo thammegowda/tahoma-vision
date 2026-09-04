@@ -2,12 +2,15 @@
 
 include(CMakeFindDependencyMacro)
 find_dependency(Threads)
+if(@TAHOMA_VISION_PDF@)
+	find_dependency(PDFium CONFIG)
+endif()
 
 if(NOT TARGET TahomaVision::Jpeg)
 	add_library(TahomaVision::Jpeg STATIC IMPORTED)
 	set_target_properties(TahomaVision::Jpeg PROPERTIES
 		IMPORTED_LOCATION
-			"${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_LIBDIR@/libtahoma_vision_jpeg.a")
+			"${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_LIBDIR@/@TAHOMA_VISION_JPEG_INSTALL_NAME@")
 endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/TahomaVisionTargets.cmake")

@@ -4,9 +4,13 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -18,7 +22,10 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
       - name: Install
-        run: cmake --install build --prefix "$PWD/install"
+        run: |
+          cmake --install build --prefix "$PWD/install"
+          test -f "$PWD/install/share/doc/TahomaVision/LICENSE"
+          test -f "$PWD/install/share/doc/TahomaVision/NOTICES.md"
       - name: Test installed package
         run: |
           cmake -S tests/consumer -B build-consumer \
@@ -30,12 +37,22 @@ jobs:
           cmake -S tests/subdirectory-consumer -B build-subdirectory-consumer
           cmake --build build-subdirectory-consumer --parallel 2
           ./build-subdirectory-consumer/tahoma_vision_subdirectory_consumer
+      - name: Test pigzpp embedding
+        run: |
+          cmake -S tests/pigzpp-embedding -B build-pigzpp-embedding
+          cmake --build build-pigzpp-embedding --parallel 2
+          ./build-pigzpp-embedding/pigzpp_embedding_probe
       - name: Test optional PDFium binary
         run: |
           cmake -S . -B build-pdfium \
             -DTAHOMA_VISION_PDF=ON \
             -DTAHOMA_VISION_BUILD_TESTS=ON \
-            -DTAHOMA_VISION_INSTALL=OFF
+            -DTAHOMA_VISION_INSTALL=ON
           cmake --build build-pdfium --parallel 2
-          ctest --test-dir build-pdfium --output-on-failure \
-            -R tahoma_vision.pdfium
+          ctest --test-dir build-pdfium --output-on-failure
+          cmake --install build-pdfium --prefix "$PWD/install-pdfium"
+          cmake -S tests/pdf-consumer -B build-pdfium-consumer \
+            -DCMAKE_PREFIX_PATH="$PWD/install-pdfium" \
+            -DPDFium_DIR="$PWD/build-pdfium/_deps/tahoma_pdfium-src"
+          cmake --build build-pdfium-consumer --parallel 2
+          ./build-pdfium-consumer/tahoma_vision_pdf_consumer
