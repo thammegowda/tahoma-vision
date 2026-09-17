@@ -80,6 +80,12 @@ int main() {
             "added PDF text color changed");
 
         const auto text_source = editable.save();
+        const std::vector documents{pdf_bytes, text_source};
+        auto merged = PdfDocument::open(merge_pdfs(documents));
+        require(merged.page_count() == 2 && merged.page(1).objects.at(1).text->text == "Hello & <PDF>",
+            "PDF merging lost page order or native text");
+        require(mean_absolute_error(source, merged.render_page({.dpi = 72.0})) < 1.0,
+            "PDF merging changed image pixels");
         const auto layers = split_pdf_text_layer(text_source);
         require(layers.text_svg.find("Hello &amp; &lt;PDF&gt;") !=
                 std::string::npos,
