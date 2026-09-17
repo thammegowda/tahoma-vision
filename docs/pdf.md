@@ -38,6 +38,11 @@ auto pdf_bytes = tahoma::vision::encode_pdf(image.view(), {.dpi = 300.0});
 
 The image writer creates one image-only page.
 
+Use `merge_pdfs(documents)` with a span of encoded byte vectors to concatenate
+PDFs in input order. It imports native pages without rasterization or recompression,
+preserving page geometry and text. Inputs must be non-empty, unencrypted PDFs;
+an empty document list or invalid input is rejected.
+
 ## Inspect and edit page objects
 
 `PdfDocument` owns an editable PDFium document. It exposes low-level page

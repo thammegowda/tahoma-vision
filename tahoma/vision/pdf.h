@@ -150,6 +150,8 @@ private:
 
 [[nodiscard]] std::vector<uint8_t> encode_pdf(
     ImageView image, const PdfEncodeOptions& options = {});
+[[nodiscard]] std::vector<uint8_t> merge_pdfs(
+    std::span<const std::vector<uint8_t>> documents);
 void save_pdf(
     const std::filesystem::path& path, ImageView image,
     const PdfEncodeOptions& options = {});

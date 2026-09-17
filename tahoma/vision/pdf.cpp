@@ -11,6 +11,7 @@
 #include <utility>
 
 #include <fpdf_edit.h>
+#include <fpdf_ppo.h>
 #include <fpdf_save.h>
 #include <fpdf_text.h>
 #include <fpdfview.h>
@@ -758,6 +759,29 @@ std::vector<uint8_t> encode_pdf(
     }
 
     return save_document(document.get());
+}
+
+std::vector<uint8_t> merge_pdfs(
+        std::span<const std::vector<uint8_t>> documents) {
+    if (documents.empty()) {
+        throw CodecError{CodecErrorCode::MalformedInput, "PDF merge requires at least one document"};
+    }
+    const auto lock = std::scoped_lock{pdfium_runtime().mutex};
+    DocumentHandle output{FPDF_CreateNewDocument()};
+    if (!output) throw CodecError{CodecErrorCode::Backend, "PDF document creation failed"};
+    size_t page_count = 0;
+    for (const auto& bytes : documents) {
+        const auto source = open_document(bytes, {});
+        const auto count = document_page_count(source.get());
+        if (count == 0 || count > static_cast<size_t>(std::numeric_limits<int>::max()) - page_count) {
+            throw CodecError{CodecErrorCode::ResourceLimit, "PDF merge page count is unsupported"};
+        }
+        if (!FPDF_ImportPages(output.get(), source.get(), nullptr, static_cast<int>(page_count))) {
+            throw CodecError{CodecErrorCode::Backend, "PDF page import failed"};
+        }
+        page_count += count;
+    }
+    return save_document(output.get());
 }
 
 void save_pdf(
