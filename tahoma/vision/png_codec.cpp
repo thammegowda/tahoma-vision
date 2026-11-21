@@ -52,21 +52,30 @@ PngHeader preflight_png(
     const auto compression = encoded[26];
     const auto filter = encoded[27];
     const auto interlace = encoded[28];
+    // Upper bound on decoded 8-bit channels; a tRNS chunk adds alpha to gray, RGB and palette images.
     uint8_t channels = 0;
+    bool valid_depth = bit_depth == 8 || bit_depth == 16;
     switch (color_type) {
-        case 0: channels = 1; break;
+        case 0:
+            channels = 2;
+            valid_depth = valid_depth || bit_depth == 1 || bit_depth == 2 || bit_depth == 4;
+            break;
+        case 3:
+            channels = 4;
+            valid_depth = bit_depth == 1 || bit_depth == 2 || bit_depth == 4 || bit_depth == 8;
+            break;
         case 4: channels = 2; break;
-        case 2: channels = 3; break;
+        case 2: channels = 4; break;
         case 6: channels = 4; break;
         default:
             throw CodecError{
                 CodecErrorCode::UnsupportedFeature,
                 "PNG color type is not supported"};
     }
-    if (bit_depth != 8 || compression != 0 || filter != 0 || interlace != 0) {
+    if (!valid_depth || compression != 0 || filter != 0 || interlace > 1) {
         throw CodecError{
             CodecErrorCode::UnsupportedFeature,
-            "PNG must be non-interlaced 8-bit input"};
+            "PNG bit depth, compression, filter or interlace method is not supported"};
     }
     const auto pixel_count = static_cast<uint64_t>(width) * height;
     if (width == 0 || height == 0 || pixel_count > options.max_pixels) {
@@ -159,7 +168,7 @@ Image decode_png(
         const auto decoded = pigzpp::png::decode(
             encoded.data(), encoded.size());
         if (decoded.width != header.width || decoded.height != header.height ||
-            decoded.channels != header.channels) {
+            decoded.channels > header.channels) {
             throw CodecError{
                 CodecErrorCode::MalformedInput,
                 "PNG dimensions changed while decoding"};

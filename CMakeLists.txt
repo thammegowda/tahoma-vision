@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
 
-project(TahomaVision VERSION 0.1.0 LANGUAGES CXX C)
+project(TahomaVision VERSION 0.2.0 LANGUAGES CXX C)
 
 include(CMakePackageConfigHelpers)
 include(ExternalProject)
