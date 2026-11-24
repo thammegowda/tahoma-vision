@@ -1,6 +1,7 @@
 #include <tahoma/vision/codec.h>
 
 #include <algorithm>
+#include <limits>
 #include <string>
 
 namespace tahoma::vision {
@@ -26,7 +27,11 @@ int64_t integer(std::span<const uint8_t> bytes, size_t& position) {
     }
     int64_t value = 0;
     while (position < bytes.size() && std::isdigit(bytes[position])) {
-        value = value * 10 + bytes[position++] - '0';
+        const auto digit = bytes[position++] - '0';
+        if (value > (std::numeric_limits<int64_t>::max() - digit) / 10) {
+            throw CodecError{CodecErrorCode::ResourceLimit, "PPM header integer is too large"};
+        }
+        value = value * 10 + digit;
     }
     return value;
 }
@@ -42,14 +47,20 @@ Image decode_ppm(std::span<const uint8_t> bytes, const DecodeOptions& options) {
     if (width <= 0 || height <= 0 || maximum != 255) {
         throw CodecError{CodecErrorCode::MalformedInput, "PPM requires positive geometry and max value 255"};
     }
+    if (static_cast<uint64_t>(width) > options.max_pixels / static_cast<uint64_t>(height)) {
+        throw CodecError{CodecErrorCode::ResourceLimit, "decoded PPM exceeds configured pixel limits"};
+    }
+    const auto pixel_count = static_cast<uint64_t>(width) * static_cast<uint64_t>(height);
+    const auto output_channels = channel_count(options.output_format);
+    if (pixel_count > options.max_decoded_bytes / output_channels) {
+        throw CodecError{CodecErrorCode::ResourceLimit, "decoded PPM exceeds configured byte limits"};
+    }
     position = skip_space(bytes, position);
-    const auto source_size = static_cast<size_t>(width * height * source_channels);
-    if (source_size > bytes.size() - position) {
+    if (pixel_count > (bytes.size() - position) / static_cast<size_t>(source_channels)) {
         throw CodecError{CodecErrorCode::MalformedInput, "truncated PPM pixels"};
     }
     auto result = make_image(width, height, options.output_format);
-    const auto output_channels = channel_count(options.output_format);
-    for (int64_t pixel = 0; pixel < width * height; ++pixel) {
+    for (uint64_t pixel = 0; pixel < pixel_count; ++pixel) {
         const auto source = position + static_cast<size_t>(pixel * source_channels);
         const auto target = static_cast<size_t>(pixel) * output_channels;
         for (size_t channel = 0; channel < output_channels; ++channel) {
